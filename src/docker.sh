@@ -167,19 +167,13 @@ docker::_download() {
         BASH_ENV="${BASH_SOURCE[0]}" docker::_download_extract "${config}" "application/vnd.oci.image.config.v1+json" "${curl_opts[@]}" -f "${req_params[@]}" -- "${url_digest}sha256:${config}"
     fi
 
-    # Check which digests are already cached.
-    printf "%s\n" "${layers[@]}" \
-      | sort -u \
-      | sort - <(ls "${ENROOT_CACHE_PATH}") \
-      | uniq -d \
-      | paste -sd '|' - \
-      | common::read -r cached_digests
-
-    if [ -n "${cached_digests}" ]; then
-        printf "%s\n" "${layers[@]}" \
-          | { grep -Ev "${cached_digests}" || :; } \
-          | readarray -t missing_digests
-    fi
+    # Check which digests are already cached - simple file existence checks.
+    missing_digests=()
+    for layer in "${layers[@]}"; do
+        if [ ! -e "${ENROOT_CACHE_PATH}/${layer}" ]; then
+            missing_digests+=("${layer}")
+        fi
+    done
 
     # Download digests, verify their checksums and extract them in the cache.
     if [ "${#missing_digests[@]}" -gt 0 ]; then
